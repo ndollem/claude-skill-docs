@@ -1,0 +1,12 @@
+{
+  "name": "docs",
+  "description": "Generate and maintain standard project documentation from the codebase. Provides /docs:init, /docs:update, and /docs:check.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Agus Salim (ndollem)",
+    "email": "ndollem@gmail.com"
+  },
+  "homepage": "https://github.com/ndollem/claude-skill-docs",
+  "repository": "https://github.com/ndollem/claude-skill-docs.git",
+  "license": "MIT"
+}

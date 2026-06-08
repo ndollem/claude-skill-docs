@@ -1,0 +1,11 @@
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+*:Zone.Identifier
+
+# Claude Code local state (do not publish personal settings)
+.claude/settings.local.json
+
+# Node (in case the plugin grows tooling later)
+node_modules/

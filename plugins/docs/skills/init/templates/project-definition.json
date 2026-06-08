@@ -1,0 +1,30 @@
+{
+  "project_name": "",
+  "generated_at": "",
+  "generated_by": "docs plugin — init skill",
+  "confidence": {
+    "business_layer": "LOW",
+    "technical_layer": "MEDIUM"
+  },
+  "problem_statement": null,
+  "business_goals": [],
+  "target_users": [],
+  "user_roles": [],
+  "features": [],
+  "integrations": [],
+  "tech_stack": {
+    "frontend": null,
+    "backend": null,
+    "database": null,
+    "infrastructure": null
+  },
+  "codebase_metadata": {
+    "entry_points": [],
+    "module_structure": [],
+    "external_dependencies": [],
+    "environment_variables": [],
+    "detected_patterns": []
+  },
+  "documentation_gaps": [],
+  "constraints": []
+}

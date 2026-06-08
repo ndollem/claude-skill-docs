@@ -1,0 +1,166 @@
+#!/usr/bin/env sh
+# ─────────────────────────────────────────────────────────────────────────────
+# doc-context — shared environment scanner for the `docs` plugin skills.
+#
+# Prints a stable, plain-text, parseable context block that the init/update/check
+# skills consume via !-injection (e.g.  !`doc-context env` ).
+#
+# Design goals:
+#   * Never error out. Every git call is guarded; missing tools degrade to a note.
+#   * Plain text only — output is inlined into a prompt, so no colors / no prompts.
+#   * Portable POSIX sh (works without bash, in non-git folders, on minimal images).
+#
+# Modes:
+#   env           Date, git status, commit count, project root, tree, stack files.
+#   diff          git diff for recent changes, or NO_GIT when not a git repo.
+#   routes        Best-effort grep for API routes / endpoints.
+#   models        Best-effort grep for ORM models / migrations / schema.
+#   integrations  Third-party services from env-var names and SDK imports.
+# ─────────────────────────────────────────────────────────────────────────────
+
+set -u
+
+MODE="${1:-env}"
+
+# Directories we never want to descend into.
+PRUNE='-name node_modules -o -name .git -o -name dist -o -name build -o -name .next -o -name vendor -o -name target -o -name __pycache__ -o -name .venv'
+
+# ── git helpers ──────────────────────────────────────────────────────────────
+has_git() {
+  command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+commit_count() {
+  git rev-list --count HEAD 2>/dev/null || echo 0
+}
+
+# ── mode: env ────────────────────────────────────────────────────────────────
+mode_env() {
+  echo "DATE=$(date +%Y-%m-%d)"
+
+  if has_git; then
+    n="$(commit_count)"
+    echo "GIT=yes"
+    echo "COMMITS=$n"
+    echo "BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+    echo "ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  else
+    echo "GIT=no"
+    echo "COMMITS=0"
+    echo "ROOT=$(pwd)"
+  fi
+
+  echo ""
+  echo "STACK_FILES:"
+  for f in package.json pyproject.toml requirements.txt go.mod Cargo.toml \
+           composer.json Gemfile pom.xml build.gradle build.gradle.kts \
+           Dockerfile docker-compose.yml docker-compose.yaml \
+           .env.example .env.sample README.md README.rst Makefile; do
+    [ -e "$f" ] && echo "  - $f"
+  done
+
+  echo ""
+  echo "TREE (top 2 levels, common build/dep dirs pruned):"
+  # -print after the prune group so pruned dirs are skipped entirely.
+  find . -maxdepth 2 \( $PRUNE \) -prune -o -print 2>/dev/null \
+    | grep -v '^\.$' \
+    | sort \
+    | head -80
+}
+
+# ── mode: diff ───────────────────────────────────────────────────────────────
+# Emits a diff of recent changes for the update/check skills. Falls back cleanly
+# when there is no git history to diff against.
+mode_diff() {
+  if ! has_git; then
+    echo "NO_GIT"
+    echo "# Not a git repository (or git not installed)."
+    echo "# Fall back to reading the files named in the skill arguments."
+    return 0
+  fi
+
+  n="$(commit_count)"
+  if [ "$n" -eq 0 ]; then
+    echo "NO_COMMITS"
+    echo "# Git repo with no commits yet. Read working-tree files directly."
+    return 0
+  fi
+
+  # Diff against up to 5 commits back, but never past the first commit.
+  back=5
+  [ "$n" -lt 6 ] && back=$((n - 1))
+
+  if [ "$back" -le 0 ]; then
+    # Single commit: diff against the empty tree so first-commit content shows.
+    empty="$(git hash-object -t tree /dev/null)"
+    echo "# Single commit — diff against empty tree:"
+    git diff --stat "$empty" HEAD 2>/dev/null | head -40
+    echo ""
+    git diff "$empty" HEAD 2>/dev/null | head -300
+  else
+    echo "# Changes over the last $back commit(s):"
+    git diff --stat "HEAD~$back" HEAD 2>/dev/null | head -40
+    echo ""
+    git diff "HEAD~$back" HEAD 2>/dev/null | head -300
+  fi
+}
+
+# ── mode: routes ─────────────────────────────────────────────────────────────
+mode_routes() {
+  echo "ROUTES (best-effort — verify against actual code):"
+  grep -rInE \
+    "(app|router|route)\.(get|post|put|patch|delete)\(|@(Get|Post|Put|Patch|Delete|RequestMapping|GetMapping|PostMapping)\(|@app\.(route|get|post)|path\(|Route::(get|post|put|delete)" \
+    . 2>/dev/null \
+    | grep -vE 'node_modules|\.git/|dist/|build/|vendor/|target/' \
+    | head -40 \
+    || echo "  (none detected)"
+}
+
+# ── mode: models ─────────────────────────────────────────────────────────────
+mode_models() {
+  echo "MODELS / SCHEMA (best-effort — verify against actual code):"
+  # Migration & schema files
+  find . \( $PRUNE \) -prune -o -type f \
+    \( -path '*migration*' -o -path '*migrations*' -o -name 'schema.prisma' \
+       -o -name '*.sql' -o -name 'models.py' -o -path '*models*' \) -print 2>/dev/null \
+    | head -30
+  echo ""
+  echo "ENTITY DECLARATIONS:"
+  grep -rInE \
+    "@Entity|class .*\(.*Model.*\)|extends Model|db\.Model|Schema\(|@Table|sequelize\.define|mongoose\.model" \
+    . 2>/dev/null \
+    | grep -vE 'node_modules|\.git/|dist/|build/|vendor/|target/' \
+    | head -30 \
+    || echo "  (none detected)"
+}
+
+# ── mode: integrations ───────────────────────────────────────────────────────
+mode_integrations() {
+  echo "ENV VARS (from .env.example / .env.sample — names only):"
+  for f in .env.example .env.sample; do
+    if [ -f "$f" ]; then
+      grep -vE '^\s*#|^\s*$' "$f" 2>/dev/null | sed 's/=.*$/=/' | head -40
+    fi
+  done
+  echo ""
+  echo "THIRD-PARTY SDK HINTS (best-effort):"
+  grep -rIniE \
+    "stripe|twilio|sendgrid|mailgun|aws-sdk|@aws|boto3|firebase|supabase|openai|anthropic|sentry|datadog|redis|kafka|rabbitmq|elasticsearch|algolia|cloudinary|s3" \
+    . 2>/dev/null \
+    | grep -ivE 'node_modules|\.git/|dist/|build/|vendor/|target/|package-lock|yarn.lock' \
+    | head -30 \
+    || echo "  (none detected)"
+}
+
+case "$MODE" in
+  env)          mode_env ;;
+  diff)         mode_diff ;;
+  routes)       mode_routes ;;
+  models)       mode_models ;;
+  integrations) mode_integrations ;;
+  *)
+    echo "doc-context: unknown mode '$MODE'" >&2
+    echo "usage: doc-context [env|diff|routes|models|integrations]" >&2
+    exit 1
+    ;;
+esac

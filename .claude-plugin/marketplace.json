@@ -1,0 +1,16 @@
+{
+  "name": "ndollem-docs-tools",
+  "description": "Marketplace for documentation tooling — generate, sync, and audit project docs with Claude Code.",
+  "owner": {
+    "name": "Agus Salim (ndollem)",
+    "email": "ndollem@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "docs",
+      "source": "./plugins/docs",
+      "description": "Documentation init/update/check skills — bootstrap, sync, and audit project docs from the codebase.",
+      "version": "1.0.0"
+    }
+  ]
+}
