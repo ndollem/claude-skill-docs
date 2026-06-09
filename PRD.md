@@ -1,8 +1,8 @@
 # Product Requirements Document
 ### doc-skills — Claude Code Documentation Skill Suite
 
-**Version**: 1.1
-**Date**: 2026-06-08
+**Version**: 1.2
+**Date**: 2026-06-09
 **Status**: Confirmed
 **Packaging**: Distributed as a Claude Code plugin (`docs`) via the `ndollem-docs-tools` marketplace. Skills are namespaced: `/docs:init`, `/docs:update`, `/docs:check`.
 
@@ -99,7 +99,8 @@ As a developer starting a new project or retrofitting docs onto an existing code
 **Acceptance Criteria**
 - Refuses to run if `docs/` already exists and contains `.md` files; directs the user to `/docs:update` instead.
 - Reads project config files (package.json, pyproject.toml, go.mod, Cargo.toml, Dockerfile, docker-compose, .env.example) before writing anything.
-- Generates all six outputs: `docs/01-prd.md`, `docs/02-erd.md`, `docs/03-architecture.md`, `docs/04-coding-standards.md`, `docs/05-decision-log.md`, `AGENTS.md`, `.ai/project-definition.json`, and `docs/LAST_REVIEWED`.
+- Generates the standard outputs: `docs/01-prd.md`, `docs/02-erd.md`, `docs/03-architecture.md`, `docs/04-coding-standards.md`, `docs/05-decision-log.md`, `AGENTS.md`, `CLAUDE.md` (imports `AGENTS.md` via `@AGENTS.md` so Claude Code loads the instructions), `.ai/project-definition.json`, and `docs/LAST_REVIEWED`.
+- **Never overwrites an existing file.** Before writing, it classifies each target as Create / Skip (already exists — preserved) / Merge, and shows all three in the confirmation preview. The only non-create action is appending the `@AGENTS.md` import to a pre-existing `CLAUDE.md` that lacks it. This holds even with `--yes`, making `/docs:init` idempotent and safe to re-run.
 - Marks every section it cannot infer with `> ⚠️ [Needs human input]` — does not fabricate business goals or user personas.
 - Reports a confidence level (LOW / MEDIUM / HIGH) for business layer and technical layer separately.
 - Prints a post-run summary listing files created, confidence levels, and sections needing human review.
@@ -211,7 +212,8 @@ A defined, consistent set of documentation files that every project using doc-sk
 | `docs/04-coding-standards.md` | Implementation standards — patterns, naming, testing, error handling, git workflow |
 | `docs/05-decision-log.md` | Architecture Decision Records (ADRs) |
 | `docs/LAST_REVIEWED` | Freshness tracking — when docs were last updated and by which skill |
-| `AGENTS.md` | Instructions for AI coding agents — read order, development rules, available skills |
+| `AGENTS.md` | Instructions for AI coding agents — read order, development rules, available skills. Source of truth (cross-tool open standard) |
+| `CLAUDE.md` | Thin importer (`@AGENTS.md`) so Claude Code, which reads `CLAUDE.md` not `AGENTS.md`, loads the agent instructions automatically |
 | `.ai/project-definition.json` | Canonical machine-readable project definition used to generate and regenerate docs |
 
 ---

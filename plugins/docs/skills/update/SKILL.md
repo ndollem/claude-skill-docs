@@ -47,6 +47,10 @@ doc-context diff
 5. **If `docs/` does not exist**, stop and tell the user to run `/docs:init` first.
 6. **Confirm before writing.** Decide all edits first, then preview them and get
    approval (Step 4.5) before touching any file — unless `--yes` was passed.
+7. **`AGENTS.md` is the source of truth; `CLAUDE.md` only imports it.** If agent
+   instructions change, edit `AGENTS.md` — never duplicate that content into `CLAUDE.md`.
+   `CLAUDE.md` is a static `@AGENTS.md` importer and should not normally be edited. The
+   one exception: if `CLAUDE.md` is missing its `@AGENTS.md` import, you may add it.
 
 ## Step 1 — Check docs exist
 
