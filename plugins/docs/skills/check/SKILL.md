@@ -30,7 +30,7 @@ Compare what is present against what should be present:
 
 Expected: `docs/01-prd.md`, `docs/02-erd.md`, `docs/03-architecture.md`,
 `docs/04-coding-standards.md`, `docs/05-decision-log.md`, `docs/LAST_REVIEWED`,
-`AGENTS.md`, `.ai/project-definition.json`.
+`AGENTS.md`, `CLAUDE.md`, `.ai/project-definition.json`.
 
 Read `docs/LAST_REVIEWED` if it exists to get the last-review date.
 
@@ -65,6 +65,12 @@ Produce PASS / WARN / FAIL for each check with a short reason.
 | Coding standards has folder structure | | |
 | Decision log has at least one ADR or note | | |
 | AGENTS.md has read order defined | | |
+| CLAUDE.md exists and imports AGENTS.md (`@AGENTS.md`) | | |
+
+A common gap: `AGENTS.md` exists but there is no `CLAUDE.md` (or it does not import
+AGENTS) — Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so the agent instructions are
+not loaded. Flag this as WARN and recommend re-running `/docs:init` (it will merge the
+import non-destructively) or adding `@AGENTS.md` to `CLAUDE.md` by hand.
 
 ### Freshness
 

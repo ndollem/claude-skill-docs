@@ -51,7 +51,7 @@ The block above gives you today's `DATE`, whether this is a git repo, the commit
 count, the project root, which stack/config files exist, and the top-level tree.
 Use the `DATE` value wherever a template contains `{{DATE}}`.
 
-## Step 1 — Refuse to overwrite existing docs
+## Step 1 — Refuse to regenerate an existing docs set
 
 If `docs/` already exists and contains any `.md` files, **STOP immediately** and tell
 the user:
@@ -60,6 +60,12 @@ the user:
 > or manually delete `docs/` if you want to regenerate from scratch.
 
 Do not proceed. (Check via the tree in the scan above, or a quick Glob of `docs/*.md`.)
+
+This guard only covers `docs/`. The **root-level** outputs (`AGENTS.md`, `CLAUDE.md`,
+`.ai/project-definition.json`) can exist independently even when `docs/` does not — a
+developer may have hand-written `CLAUDE.md`. Those collisions are handled safely in
+Step 3.5; init **never overwrites** them. So it is fine to proceed past this step when
+only root files (not `docs/`) already exist.
 
 ## Step 2 — Read the codebase
 
@@ -88,21 +94,49 @@ Before writing, summarize internally:
 - **confidence** — rate the **business layer** and **technical layer** each
   LOW / MEDIUM / HIGH based on how much real evidence you have.
 
-## Step 3.5 — Confirm before writing (safety gate)
+## Step 3.5 — Detect collisions and confirm before writing (safety gate)
 
-This skill **creates files**. Before writing anything, confirm intent — this is what
-makes the skill safe to expose in the `/` menu and safe for Claude to invoke.
+This skill **creates files**. Before writing anything, confirm intent **and guarantee no
+existing file is overwritten** — this is what makes the skill safe to expose in the `/`
+menu and safe for Claude to invoke.
 
-**Skip this gate only if** the arguments contained `--yes` / `-y`. Otherwise, present
-the plan and wait for explicit approval:
+### Classify every target
 
-- List every file you are about to create (the full set from Step 4, plus
-  `docs/LAST_REVIEWED`), noting that `docs/` and `.ai/` will be created if absent.
+Build the full target list: every `docs/*` file, `docs/LAST_REVIEWED`, `AGENTS.md`,
+`CLAUDE.md`, and `.ai/project-definition.json`. Check which already exist (Glob / Read),
+and sort each into one of three buckets:
+
+- **CREATE** — does not exist yet → will be written.
+- **SKIP** — already exists → **preserved, never overwritten**. Applies to `AGENTS.md`,
+  any stray `docs/*`, and `.ai/project-definition.json`.
+- **MERGE** — `CLAUDE.md` only, and only if it already exists. Read it:
+  - If it already imports AGENTS (`@AGENTS.md` appears anywhere) → treat as **SKIP**,
+    leave it untouched.
+  - If it exists but lacks the import → the only change offered is to **append**
+    `@AGENTS.md` plus the short "Working in this repo with Claude Code" pointer to the
+    **end** of the file, preserving all existing content. This is an `Edit` (append),
+    never a `Write` (replace).
+
+### Confirm
+
+**Skip the prompt only if** the arguments contained `--yes` / `-y`. Otherwise present the
+plan and wait for explicit approval:
+
+- Show all three buckets — **Created**, **Skipped (already exists — preserved)**, and
+  **Merged (CLAUDE.md append)** — so the user sees exactly what will and won't change.
 - State the resolved doc language and mode (passive scan vs. interactive discovery).
 - Use the `AskUserQuestion` tool to ask the user to **Proceed** or **Cancel**.
 
-If the user cancels (or does not approve), **STOP** and write nothing. Do not partially
-generate files. Only continue to Step 4 once the user has approved (or `--yes` was set).
+If the user cancels (or does not approve), **STOP** and write nothing.
+
+### `--yes` does not bypass preservation
+
+`--yes` skips the **prompt**, not the safety. Even with `--yes`: create missing files,
+skip existing ones, and append-merge `CLAUDE.md` only when it lacks the import. **Never
+overwrite an existing file under any flag.** This makes init idempotent and safe to
+re-run on a populated repo.
+
+Only continue to Step 4 once the user has approved (or `--yes` was set).
 
 ## Step 4 — Create the structure and write each document
 
@@ -118,7 +152,19 @@ scanned `DATE`. Templates live in this skill's directory:
 | `docs/04-coding-standards.md` | `${CLAUDE_SKILL_DIR}/templates/04-coding-standards.md` |
 | `docs/05-decision-log.md` | `${CLAUDE_SKILL_DIR}/templates/05-decision-log.md` |
 | `AGENTS.md` | `${CLAUDE_SKILL_DIR}/templates/AGENTS.md` |
+| `CLAUDE.md` | `${CLAUDE_SKILL_DIR}/templates/CLAUDE.md` |
 | `.ai/project-definition.json` | `${CLAUDE_SKILL_DIR}/templates/project-definition.json` |
+
+**`AGENTS.md` vs `CLAUDE.md`:** `AGENTS.md` is the single source of truth for agent
+instructions (the cross-tool open standard). Claude Code reads `CLAUDE.md`, not
+`AGENTS.md`, so `CLAUDE.md` exists only to import it (`@AGENTS.md`). Copy the `CLAUDE.md`
+template **verbatim** — it has no `{{DATE}}` or placeholders to fill.
+
+**Honor the Step 3.5 classification — never overwrite:**
+- Only **Write** a target that was classified **CREATE** (did not already exist).
+- For every **SKIP** target, do nothing — leave the existing file exactly as-is.
+- For a **MERGE** `CLAUDE.md`, **Edit** (append) the `@AGENTS.md` import + pointer to the
+  end; never replace the file.
 
 **Rules while filling templates:**
 - Replace each bracketed `[instruction]` placeholder with real, inferred content.
@@ -161,10 +207,15 @@ step entirely and leave the markers in place.
 ```
 ✅ /docs:init complete
 
-Files created:
-  docs/01-prd.md, docs/02-erd.md, docs/03-architecture.md,
-  docs/04-coding-standards.md, docs/05-decision-log.md,
-  AGENTS.md, .ai/project-definition.json, docs/LAST_REVIEWED
+Created:
+  [the files actually written — from docs/01-prd.md … docs/05-decision-log.md,
+   AGENTS.md, CLAUDE.md, .ai/project-definition.json, docs/LAST_REVIEWED]
+
+Skipped (already existed — preserved):
+  [any targets that already existed, or "none"]
+
+Merged:
+  [CLAUDE.md — appended @AGENTS.md import, if applicable; otherwise "none"]
 
 Confidence:
   Business layer: [LOW/MEDIUM/HIGH] — [reason]

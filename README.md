@@ -111,11 +111,21 @@ Generates:
 docs/01-prd.md  02-erd.md  03-architecture.md  04-coding-standards.md
 docs/05-decision-log.md  docs/LAST_REVIEWED
 AGENTS.md
+CLAUDE.md
 .ai/project-definition.json
 ```
 
+`AGENTS.md` is the source of truth for agent instructions (the cross-tool open standard).
+`CLAUDE.md` is a thin file that imports it via `@AGENTS.md` — because Claude Code reads
+`CLAUDE.md`, not `AGENTS.md`, this is what makes your agent instructions load
+automatically at session start. Editing only ever happens in `AGENTS.md`; the two never
+duplicate.
+
 Sections it cannot infer are marked `⚠️ [Needs human input]`. It never fabricates
-business goals or personas.
+business goals or personas. **Existing files are never overwritten** — on a repo that
+already has a hand-written `CLAUDE.md`, init preserves it and only appends the
+`@AGENTS.md` import if missing; any other pre-existing target is skipped. Re-running
+`/docs:init` is safe and idempotent.
 
 ### After shipping a feature
 
