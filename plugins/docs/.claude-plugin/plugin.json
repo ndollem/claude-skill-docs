@@ -1,7 +1,7 @@
 {
   "name": "docs",
-  "description": "Generate and maintain standard project documentation from the codebase. Provides /docs:init, /docs:update, and /docs:check.",
-  "version": "1.0.0",
+  "description": "Generate and maintain standard project documentation from the codebase. Provides /docs:init, /docs:update, and /docs:check — all listed in the / menu. The file-writing commands (init, update) preview their changes and ask for confirmation before writing; pass --yes to skip the prompt.",
+  "version": "1.1.0",
   "author": {
     "name": "Agus Salim (ndollem)",
     "email": "ndollem@gmail.com"

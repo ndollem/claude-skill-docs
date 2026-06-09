@@ -7,9 +7,9 @@ description: >
   Creates docs/01-prd.md, docs/02-erd.md, docs/03-architecture.md,
   docs/04-coding-standards.md, docs/05-decision-log.md, AGENTS.md,
   and .ai/project-definition.json by reading the codebase.
-argument-hint: "[optional: brief project description] [--interactive] [--lang en|id|auto]"
+  Always previews the file list and asks for confirmation before writing.
+argument-hint: "[optional: brief project description] [--interactive] [--lang en|id|auto] [--yes]"
 allowed-tools: Read Glob Grep Write AskUserQuestion Bash(doc-context *)
-disable-model-invocation: true
 ---
 
 # init
@@ -27,6 +27,8 @@ Raw arguments: **$ARGUMENTS**
   to guide generation, especially the PRD's Vision and Problem Statement.
 - If the arguments contain **`--interactive`**, run the optional discovery interview
   (see Step 6) to fill business sections instead of flagging them.
+- If the arguments contain **`--yes`** (or **`-y`**), skip the confirmation gate in
+  Step 3.5 and write the files directly. Use this for non-interactive runs.
 - **`--lang <code>`** sets the language of the **generated documentation prose**:
   - `en` (default) → write all docs in English.
   - `id` → write all docs in Bahasa Indonesia.
@@ -85,6 +87,22 @@ Before writing, summarize internally:
 - **entry_points**, **detected_patterns**, **integrations**
 - **confidence** — rate the **business layer** and **technical layer** each
   LOW / MEDIUM / HIGH based on how much real evidence you have.
+
+## Step 3.5 — Confirm before writing (safety gate)
+
+This skill **creates files**. Before writing anything, confirm intent — this is what
+makes the skill safe to expose in the `/` menu and safe for Claude to invoke.
+
+**Skip this gate only if** the arguments contained `--yes` / `-y`. Otherwise, present
+the plan and wait for explicit approval:
+
+- List every file you are about to create (the full set from Step 4, plus
+  `docs/LAST_REVIEWED`), noting that `docs/` and `.ai/` will be created if absent.
+- State the resolved doc language and mode (passive scan vs. interactive discovery).
+- Use the `AskUserQuestion` tool to ask the user to **Proceed** or **Cancel**.
+
+If the user cancels (or does not approve), **STOP** and write nothing. Do not partially
+generate files. Only continue to Step 4 once the user has approved (or `--yes` was set).
 
 ## Step 4 — Create the structure and write each document
 

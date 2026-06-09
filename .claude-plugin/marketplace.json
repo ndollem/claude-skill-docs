@@ -9,8 +9,8 @@
     {
       "name": "docs",
       "source": "./plugins/docs",
-      "description": "Documentation init/update/check skills — bootstrap, sync, and audit project docs from the codebase.",
-      "version": "1.0.0"
+      "description": "Documentation init/update/check skills — bootstrap, sync, and audit project docs from the codebase. All three commands appear in the / menu; init and update confirm before writing files (use --yes to skip).",
+      "version": "1.1.0"
     }
   ]
 }

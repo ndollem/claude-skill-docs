@@ -28,9 +28,41 @@ Add the marketplace from GitHub, then install the plugin:
 /plugin install docs@ndollem-docs-tools
 ```
 
-Anyone runs the same two commands. Updates ship when you bump `version` in
-`.claude-plugin/marketplace.json` and the plugin's `plugin.json`; users pull them with
-`/plugin marketplace update`.
+Anyone runs the same two commands.
+
+### Update an existing install
+
+When a new version is published, refresh the marketplace catalog so Claude Code sees the
+new `version`:
+
+```
+/plugin marketplace update ndollem-docs-tools
+```
+
+Then upgrade the installed copy with one of these (third-party marketplaces do **not**
+auto-update by default):
+
+- **Enable auto-update (recommended, one-time):** run `/plugin` → **Marketplaces** tab →
+  select `ndollem-docs-tools` → **Enable auto-update**. From then on Claude Code refreshes
+  the catalog and updates the plugin at startup; you'll be prompted to run
+  `/reload-plugins` when it does.
+- **Manual:** if it didn't auto-update, reinstall to pull the new version:
+  ```
+  /plugin uninstall docs@ndollem-docs-tools
+  /plugin install docs@ndollem-docs-tools
+  ```
+
+Either way, **start a new Claude Code session** (or run `/reload-plugins`) so the refreshed
+skills load. Confirm the version with `/plugin` → **Installed** tab, which lists
+`docs@ndollem-docs-tools` with its installed version.
+
+> If skills still look stale after updating, clear the plugin cache:
+> `rm -rf ~/.claude/plugins/cache`, restart Claude Code, and reinstall.
+
+> **Maintainer note:** Claude Code only detects an update when the `version` field is
+> bumped in **both** `.claude-plugin/marketplace.json` and
+> `plugins/docs/.claude-plugin/plugin.json`. Every behavior change must bump both, or
+> existing users will never receive it. The current version is **1.1.0**.
 
 ### Try it locally first (no install)
 
@@ -110,11 +142,23 @@ unresolved `⚠️` flags, and a prioritized action list. Read-only — never wr
 
 ## How invocation works
 
-- **`/docs:init`** and **`/docs:update`** set `disable-model-invocation: true` — you
-  type them manually. This prevents Claude from generating or overwriting docs without
-  your intent.
-- **`/docs:check`** can be auto-invoked by Claude when it notices the project has no
-  docs or they seem stale.
+All three commands appear in the `/` menu and can be invoked by you or by Claude. The
+safety that matters for the file-writing commands lives in the workflow, not in
+hiding them:
+
+- **`/docs:init`** and **`/docs:update`** write to disk, so they **preview the exact
+  files/sections they will change and ask for confirmation before writing**. Nothing is
+  created or edited until you approve. Pass **`--yes`** (or `-y`) to skip the prompt for
+  non-interactive runs.
+- **`/docs:check`** is read-only and can be auto-invoked by Claude when it notices the
+  project has no docs or they seem stale.
+
+> **Why not `disable-model-invocation`?** An earlier version set that flag on `init` and
+> `update`. It blocked Claude from auto-running them, but as a side effect Claude Code
+> also dropped them from the `/` autocomplete menu (the skill showed as `user-only` /
+> "locked by author"). Since plugin-skill visibility can't be toggled from user settings
+> (`skillOverrides` does not apply to plugin skills), the safety was moved into a
+> confirmation gate instead — so the commands stay visible **and** safe.
 
 ## Portability
 
