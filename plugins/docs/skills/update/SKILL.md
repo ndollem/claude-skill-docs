@@ -5,12 +5,12 @@ description: >
   Use after completing a feature, refactoring a module, changing the tech stack,
   or adding an integration. Reads changed code and updates only the affected
   sections in docs/ — never rewrites the entire document.
+  Always previews the planned edits and asks for confirmation before writing.
   Example: /docs:update auth-module
   Example: /docs:update payment-integration
   Example: /docs:update database-schema
-argument-hint: "[module, feature, or area that changed]"
-allowed-tools: Read Glob Grep Edit Write Bash(doc-context *)
-disable-model-invocation: true
+argument-hint: "[module, feature, or area that changed] [--yes]"
+allowed-tools: Read Glob Grep Edit Write AskUserQuestion Bash(doc-context *)
 ---
 
 # update
@@ -21,6 +21,10 @@ Your job is **surgical** — update only what changed, preserve everything else.
 ## Focus area
 
 **$ARGUMENTS**
+
+If the arguments contain **`--yes`** (or **`-y`**), skip the confirmation gate in
+Step 4.5 and apply the edits directly; treat the remaining text as the focus area.
+Otherwise, preview the planned edits and wait for approval before writing.
 
 ## Recent changes
 
@@ -41,6 +45,8 @@ doc-context diff
 4. **Tag AI-generated additions** with `<!-- AI-generated -->` so humans know what to
    review.
 5. **If `docs/` does not exist**, stop and tell the user to run `/docs:init` first.
+6. **Confirm before writing.** Decide all edits first, then preview them and get
+   approval (Step 4.5) before touching any file — unless `--yes` was passed.
 
 ## Step 1 — Check docs exist
 
@@ -86,6 +92,22 @@ For each doc, update **only** if `$ARGUMENTS` logically affects it:
 | AGENTS.md | Development rules changed, new workflow added |
 
 Skip every doc where the answer is no.
+
+## Step 4.5 — Confirm before writing (safety gate)
+
+This skill **edits files**. Before making any edit, confirm intent — this is what makes
+the skill safe to expose in the `/` menu and safe for Claude to invoke.
+
+**Skip this gate only if** the arguments contained `--yes` / `-y`. Otherwise, present
+the plan and wait for explicit approval:
+
+- List each document you intend to change and, for each, the specific section(s) and
+  whether it will be an `Edit` (in place) or a `Write` (new file).
+- Note any `⚠️` flags you plan to add instead of editing.
+- Use the `AskUserQuestion` tool to ask the user to **Proceed** or **Cancel**.
+
+If the user cancels (or does not approve), **STOP** and write nothing. Only continue to
+Step 5 once the user has approved (or `--yes` was set).
 
 ## Step 5 — Make targeted edits
 
