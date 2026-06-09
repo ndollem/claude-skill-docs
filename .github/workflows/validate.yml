@@ -1,0 +1,46 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate plugin manifest
+        run: claude plugin validate ./plugins/docs
+
+      - name: Validate marketplace manifest
+        run: claude plugin validate .
+
+      - name: Check shell scripts parse
+        run: |
+          sh -n plugins/docs/bin/doc-context
+          bash -n scripts/dev-install.sh
+
+      - name: Check init skill template references resolve
+        run: |
+          missing=0
+          for p in $(grep -oE '\$\{CLAUDE_SKILL_DIR\}/templates/[A-Za-z0-9._-]+' \
+                       plugins/docs/skills/init/SKILL.md | sort -u); do
+            f="plugins/docs/skills/init/${p#\$\{CLAUDE_SKILL_DIR\}/}"
+            if [ -f "$f" ]; then
+              echo "  ok: $f"
+            else
+              echo "  MISSING: $f"; missing=1
+            fi
+          done
+          exit $missing

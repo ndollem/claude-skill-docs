@@ -1,5 +1,7 @@
 # docs — Claude Code documentation plugin
 
+[![validate](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml/badge.svg)](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml)
+
 A Claude Code **plugin** that makes project documentation a first-class, low-friction
 part of development: docs are generated from the codebase, kept in sync as code evolves,
 and audited proactively instead of left to decay.
