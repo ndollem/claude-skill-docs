@@ -8,7 +8,7 @@ description: >
   docs/04-coding-standards.md, docs/05-decision-log.md, AGENTS.md,
   and .ai/project-definition.json by reading the codebase.
   Always previews the file list and asks for confirmation before writing.
-argument-hint: "[optional: brief project description] [--interactive] [--lang en|id|auto] [--yes]"
+argument-hint: "[optional: brief project description] [--scan docs|full] [--interactive] [--lang en|id|auto] [--yes]"
 allowed-tools: Read Glob Grep Write AskUserQuestion Bash(doc-context *)
 ---
 
@@ -25,6 +25,15 @@ Raw arguments: **$ARGUMENTS**
 
 - Any free text (other than the flags below) is a **project description hint** — use it
   to guide generation, especially the PRD's Vision and Problem Statement.
+- **`--scan <depth>`** controls how much of the project is read before generating docs.
+  Existing human-written documentation (README, PRD, CHANGELOG, etc.) is **always** read
+  first regardless of this flag — it only controls whether the **full codebase** is read too:
+  - `docs` → read existing docs + manifests + the environment scan only. **Cheapest**
+    (lowest token cost); best when the repo already documents itself well.
+  - `full` → read existing docs **and** do the full codebase scan (Step 2). **Thorough**
+    but higher token cost; best when existing docs are thin or you want code-verified detail.
+  - If `--scan` is **omitted**: resolve interactively in Step 1.7 (ask after summarizing the
+    existing docs). With **`--yes`** and no `--scan`, default to **`full`**.
 - If the arguments contain **`--interactive`**, run the optional discovery interview
   (see Step 6) to fill business sections instead of flagging them.
 - If the arguments contain **`--yes`** (or **`-y`**), skip the confirmation gate in
@@ -67,7 +76,56 @@ developer may have hand-written `CLAUDE.md`. Those collisions are handled safely
 Step 3.5; init **never overwrites** them. So it is fine to proceed past this step when
 only root files (not `docs/`) already exist.
 
-## Step 2 — Read the codebase
+## Step 1.5 — Read existing documentation first (always)
+
+Before reading any source code, discover and read whatever documentation the repo already
+ships. This is the **authoritative human-written reference** — it captures intent that code
+alone cannot, and grounds the generated docs at far lower token cost than a full code scan.
+
+Run the helper to list existing docs:
+
+```!
+doc-context docs
+```
+
+Read each discovered file that looks relevant — typically `README*`, `PRD*`, `CHANGELOG*` /
+release notes, `ARCHITECTURE*`, `DESIGN*`, `CONTRIBUTING*`, `ROADMAP*`, ADRs, and any
+`docs/*.md`. Treat them as **primary sources**:
+
+- Prefer existing-doc content over anything you would infer from code. Never silently
+  contradict a human-written doc; if code clearly diverges, note it as a flag later rather
+  than overwriting their intent.
+- Build an internal **coverage map**: for each standard section (vision/problem, target
+  users, business goals, tech stack, architecture, data model, coding standards, decisions),
+  note whether the existing docs already cover it **well**, **partially**, or **not at all**.
+
+If `doc-context docs` reports `(none detected)`, record that there are no existing docs and
+carry on — the codebase scan becomes the only source.
+
+## Step 1.7 — Choose scan depth
+
+Decide whether to also read the full codebase (Step 2), based on the `--scan` flag:
+
+- **`--scan docs`** → skip Step 2. Generate from existing docs + `STACK_FILES` manifests +
+  the environment scan only. (Cheapest.)
+- **`--scan full`** → proceed through Step 2 (full codebase read) in addition to the existing
+  docs already read. (Thorough.)
+- **`--yes` with no `--scan`** → default to **full**; proceed through Step 2.
+- **Neither flag** → use the `AskUserQuestion` tool to let the user choose. Summarize what
+  the existing docs already cover (from the Step 1.5 coverage map), then ask:
+  - **"Docs-only (cheaper)"** — generate from existing docs + manifests; skip the deep code
+    read. Good when existing docs are solid.
+  - **"+ Full codebase scan (thorough, higher token cost)"** — also read source to verify and
+    fill gaps. Good when existing docs are thin.
+
+  State the trade-off plainly (token cost vs. completeness) and honor the answer. Record the
+  resolved depth for Steps 5 and 7.
+
+## Step 2 — Read the codebase (full scan only)
+
+**Only perform this step if Step 1.7 resolved to a full scan.** If the depth is `docs-only`,
+skip straight to Step 3. When you do read code here, use it to **corroborate and fill gaps in**
+the existing docs from Step 1.5 — not to override human-written intent.
 
 Using the `STACK_FILES` list from the scan, read whichever exist:
 - `package.json` / `pyproject.toml` / `requirements.txt` / `go.mod` / `Cargo.toml` /
@@ -91,8 +149,12 @@ Before writing, summarize internally:
 - **project_name** — from package manifest, folder name, or git remote
 - **detected_stack** — languages, frameworks, databases from config files
 - **entry_points**, **detected_patterns**, **integrations**
+- **provenance** — for each major finding, track whether it came from an **existing doc**
+  (Step 1.5), was **inferred from code** (Step 2), or is **unknown**. Prefer existing-doc
+  content; use code only to corroborate or fill gaps.
 - **confidence** — rate the **business layer** and **technical layer** each
-  LOW / MEDIUM / HIGH based on how much real evidence you have.
+  LOW / MEDIUM / HIGH based on how much real evidence you have. Existing docs raise the
+  business-layer confidence; a docs-only scan typically lowers the technical-layer confidence.
 
 ## Step 3.5 — Detect collisions and confirm before writing (safety gate)
 
@@ -181,9 +243,14 @@ Write `docs/LAST_REVIEWED`:
 Generated by /docs:init
 Date: {{DATE}}
 Mode: bootstrap (full generation from codebase scan)
+Scan-depth: [docs-only | full] (resolved from --scan / the Step 1.7 choice)
+Existing-docs-referenced: [comma-separated list of files read in Step 1.5, or none]
 Doc-language: [en|id] (resolved from --lang; record the actual language used)
 Sections needing human review: see ⚠️ markers in each file
 ```
+
+The `Scan-depth` and `Existing-docs-referenced` lines let `/docs:update` and `/docs:check`
+know how the docs were sourced.
 
 The `Doc-language` line is how `/docs:update` and `/docs:check` know which language the
 docs are written in. Always record the resolved language (resolve `auto` to `en` or
@@ -221,6 +288,8 @@ Confidence:
   Business layer: [LOW/MEDIUM/HIGH] — [reason]
   Technical layer: [LOW/MEDIUM/HIGH] — [reason]
 
+Scan depth: [docs-only | full]
+Existing docs used: [list of files read as references, or "none found"]
 Mode: [passive scan | interactive discovery]
 Doc language: [English | Bahasa Indonesia]
 

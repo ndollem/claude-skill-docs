@@ -16,6 +16,7 @@
 #   routes        Best-effort grep for API routes / endpoints.
 #   models        Best-effort grep for ORM models / migrations / schema.
 #   integrations  Third-party services from env-var names and SDK imports.
+#   docs          Existing human-written documentation files to read first.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -u
@@ -152,15 +153,51 @@ mode_integrations() {
     || echo "  (none detected)"
 }
 
+# ── mode: docs ───────────────────────────────────────────────────────────────
+# Discovers existing human-written documentation so the skills can read it as a
+# reference BEFORE (or instead of) scanning the whole codebase. Prints paths only
+# — never contents — so the skill decides what is worth reading. Best-effort and
+# never errors: an empty result prints "(none detected)".
+mode_docs() {
+  echo "EXISTING_DOCS (best-effort — read these as references before scanning code):"
+
+  # Common documentation filenames, matched case-insensitively. We deliberately
+  # cast a wide net (root-level conventions + anything under doc-ish folders) and
+  # let the skill judge relevance.
+  found="$(
+    find . \( $PRUNE \) -prune -o -type f \
+      \( \
+        -iname 'README*'        -o -iname 'PRD*'           -o -iname 'CHANGELOG*' \
+        -o -iname 'CHANGES*'    -o -iname 'HISTORY*'        -o -iname 'RELEASE*' \
+        -o -iname 'RELEASENOTES*' \
+        -o -iname 'CONTRIBUTING*' -o -iname 'ARCHITECTURE*' -o -iname 'DESIGN*' \
+        -o -iname 'ROADMAP*'    -o -iname 'SECURITY*'       -o -iname 'SPEC*' \
+        -o -iname 'ADR-*' \
+        -o -path '*/docs/*.md'  -o -path '*/doc/*.md'       -o -path '*/documentation/*.md' \
+        -o -path '*/adr/*.md'   -o -path '*/decisions/*.md' -o -path '*/wiki/*.md' \
+      \) -print 2>/dev/null \
+      | sed 's|^\./||' \
+      | sort -u \
+      | head -60
+  )"
+
+  if [ -n "$found" ]; then
+    echo "$found" | sed 's/^/  /'
+  else
+    echo "  (none detected)"
+  fi
+}
+
 case "$MODE" in
   env)          mode_env ;;
   diff)         mode_diff ;;
   routes)       mode_routes ;;
   models)       mode_models ;;
   integrations) mode_integrations ;;
+  docs)         mode_docs ;;
   *)
     echo "doc-context: unknown mode '$MODE'" >&2
-    echo "usage: doc-context [env|diff|routes|models|integrations]" >&2
+    echo "usage: doc-context [env|diff|routes|models|integrations|docs]" >&2
     exit 1
     ;;
 esac

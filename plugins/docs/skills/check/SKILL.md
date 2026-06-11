@@ -45,6 +45,14 @@ Use the environment scan above plus these helpers to compare docs against realit
 - `` !`doc-context routes` `` — API routes/endpoints currently in code
 - `` !`doc-context models` `` — ORM models, migrations, schema files
 - `` !`doc-context integrations` `` — env-var names and third-party SDK hints
+- `` !`doc-context docs` `` — existing documentation files (README/CHANGELOG/ARCHITECTURE/etc.)
+
+This helper lists **all** documentation it finds, which includes the standard set this plugin
+generates (`docs/01-prd.md` … `docs/05-decision-log.md`, `docs/LAST_REVIEWED`). For the
+**External-docs** checks below, ignore those generated files and consider only the *other*
+docs — root-level `README`, `CHANGELOG`/release notes, `ARCHITECTURE`, `CONTRIBUTING`, ADRs,
+and any non-standard `docs/*.md`. You don't need to read each in full; skim the ones likely to
+overlap the standard set so you can judge whether `docs/` reflects them.
 
 Also read `package.json` / `pyproject.toml` / equivalent for the current dependency
 list. If the scan reported `GIT=no`, note that freshness-by-commits cannot be measured
@@ -66,6 +74,7 @@ Produce PASS / WARN / FAIL for each check with a short reason.
 | Decision log has at least one ADR or note | | |
 | AGENTS.md has read order defined | | |
 | CLAUDE.md exists and imports AGENTS.md (`@AGENTS.md`) | | |
+| External docs present (README/CHANGELOG/etc.) | | |
 
 A common gap: `AGENTS.md` exists but there is no `CLAUDE.md` (or it does not import
 AGENTS) — Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so the agent instructions are
@@ -92,9 +101,12 @@ import non-destructively) or adding `@AGENTS.md` to `CLAUDE.md` by hand.
 | Database models/entities | | | |
 | Third-party integrations | | | |
 | Environment variables | | | |
+| External docs reflected in docs/ | | | |
 
 Drift = something in code that is not in docs, or docs describing something no longer
-in code.
+in code. For the **External docs** row, flag when an existing external doc carries content
+the standard set omits — e.g. a `CHANGELOG` lists features absent from `docs/01-prd.md`, or a
+`README` describes a stack the ERD doesn't mention.
 
 ### Quality
 
