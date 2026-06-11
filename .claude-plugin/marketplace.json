@@ -9,8 +9,8 @@
     {
       "name": "docs",
       "source": "./plugins/docs",
-      "description": "Documentation init/update/check skills — bootstrap, sync, and audit project docs from the codebase. init also writes a CLAUDE.md that imports AGENTS.md so Claude Code loads it; existing files are never overwritten. All three commands appear in the / menu; init and update confirm before writing files (use --yes to skip).",
-      "version": "1.2.0"
+      "description": "Documentation init/update/check skills — bootstrap, sync, and audit project docs from the codebase. init reads existing docs (README/CHANGELOG/etc.) before optionally scanning the code (--scan docs|full), then writes a CLAUDE.md that imports AGENTS.md so Claude Code loads it; existing files are never overwritten. All three commands appear in the / menu; init and update confirm before writing files (use --yes to skip).",
+      "version": "1.3.0"
     }
   ]
 }

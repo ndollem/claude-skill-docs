@@ -82,6 +82,24 @@ The diff block above shows recent changes. Interpret it as follows:
 Either way, also read the specific source/test/migration/route/config files that
 `$ARGUMENTS` refers to, so your edits reflect the real current code.
 
+### Also consult relevant existing/external docs
+
+Some changes are documented by the project itself outside `docs/` — a release or version
+bump in a `CHANGELOG` / release notes, a new module described in the `README` or an
+`ARCHITECTURE` doc. List them with:
+
+```!
+doc-context docs
+```
+
+The helper lists every doc it finds, including the standard set this plugin generates
+(`docs/01-prd.md` …) — ignore those here and look only at the project's *own* external docs.
+When `$ARGUMENTS` plausibly relates to one (e.g. `release-notes`/`changelog` → the
+`CHANGELOG`; a new feature or module → `README` / `ARCHITECTURE`), read that external doc and
+reconcile your `docs/` edit against it — match its terminology and don't contradict it. This
+stays **surgical**: you still only edit files under `docs/` (and `AGENTS.md` /
+`.ai/project-definition.json`), never the external docs themselves.
+
 ## Step 4 — Decide what to update
 
 For each doc, update **only** if `$ARGUMENTS` logically affects it:

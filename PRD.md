@@ -1,8 +1,8 @@
 # Product Requirements Document
 ### doc-skills — Claude Code Documentation Skill Suite
 
-**Version**: 1.2
-**Date**: 2026-06-09
+**Version**: 1.3
+**Date**: 2026-06-11
 **Status**: Confirmed
 **Packaging**: Distributed as a Claude Code plugin (`docs`) via the `ndollem-docs-tools` marketplace. Skills are namespaced: `/docs:init`, `/docs:update`, `/docs:check`.
 
@@ -91,14 +91,16 @@ A new engineer joins a project. They add the team marketplace and install the pl
 ### Feature 1 — `/docs:init`
 
 **Description**
-Bootstrap a complete standard documentation set for a project that has no existing `docs/` folder. Scans the codebase, infers as much as possible, flags what it cannot determine, and generates all documents in one pass.
+Bootstrap a complete standard documentation set for a project that has no existing `docs/` folder. Reads any documentation the repo already ships (README, PRD, CHANGELOG, release notes, ARCHITECTURE, ADRs, `docs/*.md`) as the authoritative reference first, then optionally scans the codebase to corroborate and fill gaps, flags what it cannot determine, and generates all documents in one pass.
 
 **User Story**
 As a developer starting a new project or retrofitting docs onto an existing codebase, I want to generate a full documentation set automatically so that I don't have to write templates from scratch or repeat myself across multiple documents.
 
 **Acceptance Criteria**
 - Refuses to run if `docs/` already exists and contains `.md` files; directs the user to `/docs:update` instead.
+- Reads existing human-written documentation first (via `doc-context docs`: README, PRD, CHANGELOG, release notes, ARCHITECTURE, CONTRIBUTING, ROADMAP, ADRs, `docs/*.md`) and treats it as the authoritative reference, never silently contradicting it.
 - Reads project config files (package.json, pyproject.toml, go.mod, Cargo.toml, Dockerfile, docker-compose, .env.example) before writing anything.
+- Supports an optional `--scan docs|full` flag controlling read depth: `docs` reads existing docs + manifests only (cheapest), `full` also scans the codebase (thorough, higher token cost). When omitted, asks the user interactively after summarizing existing-doc coverage; with `--yes` and no `--scan`, defaults to `full`. The resolved depth and the referenced docs are recorded in `docs/LAST_REVIEWED`.
 - Generates the standard outputs: `docs/01-prd.md`, `docs/02-erd.md`, `docs/03-architecture.md`, `docs/04-coding-standards.md`, `docs/05-decision-log.md`, `AGENTS.md`, `CLAUDE.md` (imports `AGENTS.md` via `@AGENTS.md` so Claude Code loads the instructions), `.ai/project-definition.json`, and `docs/LAST_REVIEWED`.
 - **Never overwrites an existing file.** Before writing, it classifies each target as Create / Skip (already exists — preserved) / Merge, and shows all three in the confirmation preview. The only non-create action is appending the `@AGENTS.md` import to a pre-existing `CLAUDE.md` that lacks it. This holds even with `--yes`, making `/docs:init` idempotent and safe to re-run.
 - Marks every section it cannot infer with `> ⚠️ [Needs human input]` — does not fabricate business goals or user personas.
@@ -130,6 +132,7 @@ As a developer who has just shipped a feature or refactored a module, I want to 
 - Requires a `docs/` folder to exist; stops and directs the user to `/docs:init` if absent.
 - Reads all existing doc files before making any changes.
 - Reads recent changes via `doc-context diff` (git-aware) and the files relevant to `$ARGUMENTS`. When the project has no git history, falls back to reading the files named in `$ARGUMENTS` directly.
+- Consults relevant existing/external docs (via `doc-context docs`) when `$ARGUMENTS` relates to one — e.g. a release/version bump reconciles against the `CHANGELOG`/release notes — while still editing only files under `docs/`.
 - Performs surgical edits with the `Edit` tool — changes only affected sections and never rewrites a whole document. `Write` is used only to create a file that does not yet exist.
 - Updates only sections in documents that are logically affected by `$ARGUMENTS`.
 - Never modifies business goals, vision, or product decisions — flags them for human confirmation if they appear to have changed.
@@ -161,6 +164,7 @@ As a developer returning to a project or preparing for a release, I want a clear
 - Reports whether all expected doc files exist.
 - Checks `LAST_REVIEWED` and reports days since last update, plus the number of git commits since then when the project uses git (reports N/A otherwise).
 - Detects drift by comparing documented tech stack, integrations, API routes, and database models against what is currently present in the codebase.
+- Inventories existing external docs (via `doc-context docs`) and flags when content they carry (e.g. CHANGELOG features, README stack) is not reflected in the standard `docs/` set.
 - Counts and lists all unresolved `⚠️` markers across all docs.
 - Counts `<!-- AI-generated -->` sections not yet confirmed by a human.
 - Assigns an overall health score: 🟢 Good, 🟡 Needs attention, 🔴 Outdated.

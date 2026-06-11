@@ -1,14 +1,14 @@
 # docs — Claude Code documentation plugin
 
 [![validate](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml/badge.svg)](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml)
-[![version](https://img.shields.io/badge/version-1.2.0-blue)](plugins/docs/.claude-plugin/plugin.json)
+[![version](https://img.shields.io/badge/version-1.3.0-blue)](plugins/docs/.claude-plugin/plugin.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A [Claude Code](https://claude.com/claude-code) **plugin** that makes project documentation a first-class, low-friction part of development. Instead of writing docs by hand and watching them decay, you get three commands that **generate docs from the codebase, keep them in sync as code evolves, and audit them for drift**:
 
 | Command | What it does | Writes files? |
 |---|---|---|
-| [`/docs:init`](#1-docsinit--bootstrap-documentation) | Bootstrap a full `docs/` set by scanning the codebase | ✏️ Yes (confirm-gated) |
+| [`/docs:init`](#1-docsinit--bootstrap-documentation) | Bootstrap a full `docs/` set — reads existing docs first, then optionally scans the codebase | ✏️ Yes (confirm-gated) |
 | [`/docs:update [area]`](#2-docsupdate--sync-docs-after-a-change) | Surgically update the sections affected by a feature or refactor | ✏️ Yes (confirm-gated) |
 | [`/docs:check`](#3-docscheck--audit-documentation-health) | Audit doc health: completeness, freshness, drift vs. code | 🔒 Read-only |
 
@@ -102,11 +102,13 @@ Use this **once per project**: on a brand-new repo, or to retrofit documentation
 
 1. **Environment scan** — detects today's date, git status, project root, stack/config files, and the top-level tree (via the bundled `doc-context` scanner).
 2. **Guard check** — if `docs/` already contains `.md` files, it stops and points you to `/docs:update` instead. Re-running init can never clobber an existing docs set.
-3. **Codebase read** — reads your package manifest, README, `.env.example` (names only, never values), Dockerfiles, routes, models, and a representative sample of source.
-4. **Preview + confirmation gate** — before writing anything, it shows exactly which files will be **Created**, which existing files will be **Skipped (preserved)**, and whether `CLAUDE.md` will be **Merged** (append-only). You approve or cancel.
-5. **Generation** — fills the eight bundled templates with what it actually found.
+3. **Existing-docs read** — discovers and reads whatever documentation the repo already ships (README, PRD, CHANGELOG, release notes, ARCHITECTURE, CONTRIBUTING, ROADMAP, ADRs, `docs/*.md`) and uses it as the **authoritative reference** before touching any source. This grounds the output in human-written intent at low token cost.
+4. **Scan-depth choice** — decides whether to also read the full codebase. With `--scan docs` it stays docs-only (cheapest); with `--scan full` it also scans source (thorough); with neither flag it asks you, summarizing what the existing docs already cover so you can weigh token cost vs. completeness. `--yes` defaults to full.
+5. **Codebase read** (full scan only) — reads your package manifest, `.env.example` (names only, never values), Dockerfiles, routes, models, and a representative sample of source, to corroborate and fill gaps in the existing docs.
+6. **Preview + confirmation gate** — before writing anything, it shows exactly which files will be **Created**, which existing files will be **Skipped (preserved)**, and whether `CLAUDE.md` will be **Merged** (append-only). You approve or cancel.
+7. **Generation** — fills the eight bundled templates with what it actually found.
 Anything it cannot infer is marked `⚠️ [Needs human input]` — it never invents business goals, personas, or metrics.
-6. **Summary** — prints what was created, a confidence rating, and your next steps.
+8. **Summary** — prints what was created, a confidence rating, and your next steps.
 
 **Basic usage:**
 
@@ -118,6 +120,13 @@ Anything it cannot infer is marked `⚠️ [Needs human input]` — it never inv
 
 ```
 /docs:init SaaS app for managing restaurant reservations
+```
+
+**Scan depth** — control how much is read before generating. Existing docs are always read first; this only governs whether the full codebase is read too. `docs` is cheapest (existing docs + manifests); `full` is thorough (also scans source). Omit the flag to be asked interactively:
+
+```
+/docs:init --scan docs     # cheap, grounded in existing docs
+/docs:init --scan full     # thorough, code-verified (higher token cost)
 ```
 
 **Interview mode** — instead of leaving `⚠️` markers, it asks you about Vision, Target Users, Business Goals, and Out of Scope, and writes your answers into the PRD:
@@ -165,6 +174,8 @@ Confidence:
   Business layer: LOW — no PRD or business docs found; goals flagged for human input
   Technical layer: HIGH — stack, routes, and models inferred from package.json and src/
 
+Scan depth: full
+Existing docs used: README.md
 Mode: passive scan
 Doc language: English
 
@@ -303,6 +314,7 @@ Health scoring: 🟢 Good (no FAILs, reviewed within 14 days) · 🟡 Needs atte
 | Command | Arguments & flags | Notes |
 |---|---|---|
 | `/docs:init` | `[description hint]` | Free text guides the PRD's Vision / Problem Statement |
+| | `--scan docs\|full` | Read depth: `docs` = existing docs + manifests only (cheapest); `full` = also scan source (thorough). Omit to be asked; `--yes` defaults to `full` |
 | | `--interactive` | Interview you to fill business sections instead of `⚠️` markers |
 | | `--lang en\|id\|auto` | Language of generated prose (default `en`); structure stays English |
 | | `--yes`, `-y` | Skip the confirmation prompt (never bypasses overwrite protection) |
@@ -349,6 +361,7 @@ CLAUDE.md                 Thin importer: @AGENTS.md (what Claude Code actually l
 ## Design principles
 
 - **Never overwrite.** Existing files are always preserved — init creates what's missing, skips what exists, and at most *appends* the `@AGENTS.md` import to a pre-existing `CLAUDE.md`. Re-running `/docs:init` is safe and idempotent, even with `--yes`.
+- **Existing docs first.** `/docs:init` reads whatever documentation the repo already ships (README, CHANGELOG, ARCHITECTURE, ADRs, …) as the authoritative reference before scanning code, then lets you decide via `--scan` whether a full codebase read is worth the extra token cost. `/docs:update` and `/docs:check` consult these external docs too.
 - **Never fabricate.** Business goals, personas, and metrics are flagged for human input, not invented. In `project-definition.json`, unknowns are `null`, never guesses.
 - **Surgical updates.** `/docs:update` edits only affected sections and tags additions `<!-- AI-generated -->`; human prose is preserved verbatim.
 - **Confirm before writing.** The file-writing commands preview their exact plan and ask for approval first (skippable with `--yes`). `/docs:check` is read-only by design.

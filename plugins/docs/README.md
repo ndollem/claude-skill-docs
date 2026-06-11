@@ -5,7 +5,7 @@ reading the codebase. Three skills, namespaced under `docs`:
 
 | Command | What it does |
 |---|---|
-| `/docs:init` | Bootstrap full `docs/` from scratch by scanning an existing codebase |
+| `/docs:init` | Bootstrap full `docs/` from scratch — reads existing docs first, then optionally scans the codebase (`--scan docs\|full`) |
 | `/docs:update [area]` | Update specific docs sections after a feature or refactor |
 | `/docs:check` | Audit documentation health and surface drift vs. the codebase |
 
@@ -41,6 +41,12 @@ The skills never fabricate business goals, personas, or metrics.
   human review rather than inventing or changing them.
 - **Opt-in discovery.** `/docs:init … --interactive` interviews you to fill business
   sections instead of leaving `⚠️` markers.
+- **Reads your existing docs first.** Before scanning any source, `/docs:init` reads the
+  documentation the repo already ships (README, PRD, CHANGELOG, release notes, ARCHITECTURE,
+  ADRs, `docs/*.md`) and uses it as the authoritative reference. It then asks whether to also
+  do a full codebase scan — `--scan docs` stays cheap and grounded in those docs, `--scan
+  full` adds a code-verified pass at higher token cost. `/docs:update` and `/docs:check`
+  consult these external docs too.
 
 ## Local development
 
