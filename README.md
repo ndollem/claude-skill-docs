@@ -1,16 +1,17 @@
 # docs — Claude Code documentation plugin
 
 [![validate](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml/badge.svg)](https://github.com/ndollem/claude-skill-docs/actions/workflows/validate.yml)
-[![version](https://img.shields.io/badge/version-1.3.0-blue)](plugins/docs/.claude-plugin/plugin.json)
+[![version](https://img.shields.io/badge/version-1.4.0-blue)](plugins/docs/.claude-plugin/plugin.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A [Claude Code](https://claude.com/claude-code) **plugin** that makes project documentation a first-class, low-friction part of development. Instead of writing docs by hand and watching them decay, you get three commands that **generate docs from the codebase, keep them in sync as code evolves, and audit them for drift**:
+A [Claude Code](https://claude.com/claude-code) **plugin** that makes project documentation a first-class, low-friction part of development. Instead of writing docs by hand and watching them decay, you get four commands that **generate docs from the codebase, keep them in sync as code evolves, audit them for drift, and record what changed in each branch**:
 
 | Command | What it does | Writes files? |
 |---|---|---|
 | [`/docs:init`](#1-docsinit--bootstrap-documentation) | Bootstrap a full `docs/` set — reads existing docs first, then optionally scans the codebase | ✏️ Yes (confirm-gated) |
 | [`/docs:update [area]`](#2-docsupdate--sync-docs-after-a-change) | Surgically update the sections affected by a feature or refactor | ✏️ Yes (confirm-gated) |
 | [`/docs:check`](#3-docscheck--audit-documentation-health) | Audit doc health: completeness, freshness, drift vs. code | 🔒 Read-only |
+| [`/docs:changelog [name]`](#4-docschangelog--record-what-changed-in-a-branch) | Draft Keep a Changelog notes from the branch diff vs. main, trace ticket numbers | ✏️ Yes (confirm-gated) |
 
 This repository is also a **plugin marketplace** (`ndollem-docs-tools`), so the plugin installs and updates through Claude Code's native plugin system — no install script.
 
@@ -26,6 +27,7 @@ This repository is also a **plugin marketplace** (`ndollem-docs-tools`), so the 
   - [1. `/docs:init` — bootstrap documentation](#1-docsinit--bootstrap-documentation)
   - [2. `/docs:update` — sync docs after a change](#2-docsupdate--sync-docs-after-a-change)
   - [3. `/docs:check` — audit documentation health](#3-docscheck--audit-documentation-health)
+  - [4. `/docs:changelog` — record what changed in a branch](#4-docschangelog--record-what-changed-in-a-branch)
 - [Command & flag reference](#command--flag-reference)
 - [Recommended workflow](#recommended-workflow)
 - [What gets generated](#what-gets-generated)
@@ -66,8 +68,8 @@ Add the marketplace from GitHub, then install the plugin — two commands, run i
 
 Verify the install:
 
-1. Run `/plugin` → **Installed** tab → you should see `docs@ndollem-docs-tools 1.2.0`.
-2. Type `/docs` in the prompt — autocomplete should offer `/docs:init`, `/docs:update`, and `/docs:check`.
+1. Run `/plugin` → **Installed** tab → you should see `docs@ndollem-docs-tools 1.4.0`.
+2. Type `/docs` in the prompt — autocomplete should offer `/docs:init`, `/docs:update`, `/docs:check`, and `/docs:changelog`.
 
 > Prefer to try it without installing? See [Local development](#local-development).
 
@@ -307,6 +309,47 @@ Health scoring: 🟢 Good (no FAILs, reviewed within 14 days) · 🟡 Needs atte
 
 </details>
 
+### 4. `/docs:changelog` — record what changed in a branch
+
+Run this **after finishing work on a feature branch**, before merging. It compares the current branch against `main` (or `master`), drafts standard [Keep a Changelog](https://keepachangelog.com/) notes from the diff, traces the ticket numbers behind the work, and saves a dated entry under `docs/changelog/YYYY/MM/DD/`:
+
+```
+/docs:changelog auth-migration
+/docs:changelog "payment webhooks" --yes
+```
+
+Pass the feature, module, or task name as the argument — it becomes the file name (slugified to kebab-case). If you omit it, the skill asks for it.
+
+**Step by step, what happens when you run it:**
+
+1. Checks `docs/` exists — if not, it stops and tells you to run `/docs:init` first. It also needs git history with a base branch to diff against.
+2. Reads the branch diff against `main`/`master` (via the `doc-context changelog-diff` scanner): the changed files, the commit subjects, and the author.
+3. **Traces tickets** — scans the branch name and every commit subject for tracker keys (`PROJ-123`, `JIRA-456`) and GitHub issue numbers (`#123`), collecting **all** unique references. A branch carrying work for several tickets lists all of them. Unless you pass `--yes`, it asks you to confirm, edit, or add tickets.
+4. Drafts the entry — classifies changes into **Added / Changed / Fixed / Removed / Security**, appends the relevant ticket key to each bullet for traceability (e.g. `- Add refresh-token rotation [PROJ-123]`), and writes a short overview. Empty sections are dropped.
+5. **Preview + confirmation gate** — shows the full drafted Markdown and the destination path before writing. You approve or cancel (`--yes` skips the prompt).
+6. Writes `docs/changelog/YYYY/MM/DD/[name].md` and refreshes `docs/LAST_REVIEWED`.
+
+<details>
+<summary><strong>Example: expected output</strong></summary>
+
+```
+✅ /docs:changelog complete
+
+Entry written: docs/changelog/2026/06/18/auth-migration.md
+Branch:        feat/auth-migration (vs main)
+Tickets traced: PROJ-123, PROJ-130
+
+Sections included:
+  Added, Changed, Security
+
+Suggested next step:
+  Review the <!-- AI-generated --> entry, then commit docs/changelog/.
+```
+
+</details>
+
+The entries are dated and ticket-tagged, so `docs/changelog/` becomes a browsable, traceable history of what shipped — each note links back to the task tracker. Like the other writers, the generated content is tagged `<!-- AI-generated -->` for review, and nothing is written without your confirmation (unless you pass `--yes`).
+
 ---
 
 ## Command & flag reference
@@ -321,6 +364,8 @@ Health scoring: 🟢 Good (no FAILs, reviewed within 14 days) · 🟡 Needs atte
 | `/docs:update` | `<area>` (required) | Module, feature, or change to sync — e.g. `auth-module` |
 | | `--yes`, `-y` | Skip the confirmation prompt |
 | `/docs:check` | *(none)* | Read-only; takes no flags |
+| `/docs:changelog` | `[name]` | Feature/module/task name → the entry's file name; asked for if omitted |
+| | `--yes`, `-y` | Skip the ticket-confirmation and write-confirmation prompts |
 
 ## Recommended workflow
 
@@ -332,6 +377,10 @@ Health scoring: 🟢 Good (no FAILs, reviewed within 14 days) · 🟡 Needs atte
 │  Every feature / refactor                                   │
 │    ship code  →  /docs:update <area>  →  review             │
 │    <!-- AI-generated --> tags  →  commit                    │
+├─────────────────────────────────────────────────────────────┤
+│  Before merging a feature branch                            │
+│    /docs:changelog <name>  →  review  →  commit             │
+│    docs/changelog/YYYY/MM/DD/<name>.md                      │
 ├─────────────────────────────────────────────────────────────┤
 │  Periodically (weekly, before releases, after time away)    │
 │    /docs:check  →  follow the prioritized action list       │
@@ -352,6 +401,7 @@ docs/
   03-architecture.md      System design, components, data flow, API surface
   04-coding-standards.md  Detected patterns, folder structure, conventions
   05-decision-log.md      Architecture Decision Records (ADRs)
+  changelog/YYYY/MM/DD/   Dated Keep a Changelog entries from /docs:changelog
   LAST_REVIEWED           Freshness marker used by /docs:check
 AGENTS.md                 Agent instructions — single source of truth (open standard)
 CLAUDE.md                 Thin importer: @AGENTS.md (what Claude Code actually loads)
@@ -446,6 +496,8 @@ plugins/docs/
   skills/init/templates/           # the 8 doc templates
   skills/update/SKILL.md           # /docs:update
   skills/check/SKILL.md            # /docs:check
+  skills/changelog/SKILL.md        # /docs:changelog
+  skills/changelog/templates/      # the changelog entry template
   README.md                        # plugin-level readme
 scripts/dev-install.sh             # local --plugin-dir launcher
 .github/workflows/validate.yml     # CI: validates plugin + marketplace manifests
@@ -457,7 +509,7 @@ PRD.md                             # product requirements for this plugin
 Issues and pull requests are welcome at
 [ndollem/claude-skill-docs](https://github.com/ndollem/claude-skill-docs). A few ground rules for changes:
 
-- **Version bumps are mandatory.** Claude Code only detects an update when the `version` field is bumped in **both** `.claude-plugin/marketplace.json` and `plugins/docs/.claude-plugin/plugin.json`. Every behavior change must bump both, or existing users will never receive it. The current version is **1.2.0**.
+- **Version bumps are mandatory.** Claude Code only detects an update when the `version` field is bumped in **both** `.claude-plugin/marketplace.json` and `plugins/docs/.claude-plugin/plugin.json`. Every behavior change must bump both, or existing users will never receive it. The current version is **1.4.0**.
 - Test changes locally with `claude --plugin-dir ./plugins/docs` before opening a PR.
 - CI validates the plugin and marketplace manifests on every push.
 
