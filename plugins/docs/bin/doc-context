@@ -11,8 +11,9 @@
 #   * Portable POSIX sh (works without bash, in non-git folders, on minimal images).
 #
 # Modes:
-#   env           Date, git status, commit count, project root, tree, stack files.
-#   diff          git diff for recent changes, or NO_GIT when not a git repo.
+#   env            Date, git status, commit count, project root, tree, stack files.
+#   diff           git diff for recent changes, or NO_GIT when not a git repo.
+#   changelog-diff git diff of base branch (main/master) vs HEAD + commit subjects.
 #   routes        Best-effort grep for API routes / endpoints.
 #   models        Best-effort grep for ORM models / migrations / schema.
 #   integrations  Third-party services from env-var names and SDK imports.
@@ -106,6 +107,52 @@ mode_diff() {
   fi
 }
 
+# ── mode: changelog-diff ──────────────────────────────────────────────────────
+# Emits the diff between the base branch (main/master) and HEAD, plus the commit
+# subjects on this branch — used by /docs:changelog to draft notes and trace the
+# ticket numbers embedded in branch names / commit messages. Degrades cleanly when
+# there is no git, no base branch, or no commits.
+mode_changelog_diff() {
+  if ! has_git; then
+    echo "NO_GIT"
+    echo "# Not a git repository (or git not installed)."
+    echo "# Fall back to reading the working-tree files named in the skill arguments."
+    return 0
+  fi
+
+  if [ "$(commit_count)" -eq 0 ]; then
+    echo "NO_COMMITS"
+    echo "# Git repo with no commits yet. Read working-tree files directly."
+    return 0
+  fi
+
+  # Determine the base branch to diff against: prefer main, fall back to master,
+  # then to the previous commit when neither branch exists.
+  base_branch="main"
+  if ! git show-ref --verify --quiet refs/heads/main \
+     && ! git show-ref --verify --quiet refs/remotes/origin/main; then
+    if git show-ref --verify --quiet refs/heads/master \
+       || git show-ref --verify --quiet refs/remotes/origin/master; then
+      base_branch="master"
+    else
+      base_branch="HEAD~1"
+    fi
+  fi
+
+  echo "BASE_BRANCH=$base_branch"
+  echo "CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+  echo "AUTHOR=$(git log -1 --pretty=format:'%an <%ae>' 2>/dev/null || echo unknown)"
+  echo ""
+  echo "RECENT_COMMITS:"
+  git log "$base_branch...HEAD" --oneline 2>/dev/null | head -50
+  echo ""
+  echo "DIFF_STAT:"
+  git diff --stat "$base_branch...HEAD" 2>/dev/null | head -40
+  echo ""
+  echo "DIFF_DETAILS:"
+  git diff "$base_branch...HEAD" 2>/dev/null | head -500
+}
+
 # ── mode: routes ─────────────────────────────────────────────────────────────
 mode_routes() {
   echo "ROUTES (best-effort — verify against actual code):"
@@ -189,15 +236,16 @@ mode_docs() {
 }
 
 case "$MODE" in
-  env)          mode_env ;;
-  diff)         mode_diff ;;
-  routes)       mode_routes ;;
+  env)            mode_env ;;
+  diff)           mode_diff ;;
+  changelog-diff) mode_changelog_diff ;;
+  routes)         mode_routes ;;
   models)       mode_models ;;
   integrations) mode_integrations ;;
   docs)         mode_docs ;;
   *)
     echo "doc-context: unknown mode '$MODE'" >&2
-    echo "usage: doc-context [env|diff|routes|models|integrations|docs]" >&2
+    echo "usage: doc-context [env|diff|changelog-diff|routes|models|integrations|docs]" >&2
     exit 1
     ;;
 esac
