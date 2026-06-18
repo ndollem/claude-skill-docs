@@ -1,7 +1,7 @@
 {
   "name": "docs",
-  "description": "Generate and maintain standard project documentation from the codebase. Provides /docs:init, /docs:update, and /docs:check — all listed in the / menu. init reads existing docs (README/CHANGELOG/etc.) before optionally scanning the code (--scan docs|full), then generates docs/, AGENTS.md, and a CLAUDE.md that imports it (so Claude Code loads the agent instructions); existing files are never overwritten. The file-writing commands (init, update) preview their changes and ask for confirmation before writing; pass --yes to skip the prompt.",
-  "version": "1.3.0",
+  "description": "Generate and maintain standard project documentation from the codebase. Provides /docs:init, /docs:update, /docs:check, and /docs:changelog — all listed in the / menu. init reads existing docs (README/CHANGELOG/etc.) before optionally scanning the code (--scan docs|full), then generates docs/, AGENTS.md, and a CLAUDE.md that imports it (so Claude Code loads the agent instructions); existing files are never overwritten. changelog drafts Keep a Changelog notes from the branch diff against main, traces ticket numbers, and writes them to docs/changelog/YYYY/MM/DD/. The file-writing commands (init, update, changelog) preview their changes and ask for confirmation before writing; pass --yes to skip the prompt.",
+  "version": "1.4.0",
   "author": {
     "name": "Agus Salim (ndollem)",
     "email": "ndollem@gmail.com"
