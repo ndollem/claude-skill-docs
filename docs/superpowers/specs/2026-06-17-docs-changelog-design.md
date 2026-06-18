@@ -90,6 +90,9 @@ mode_changelog_diff() {
   echo "CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
   echo "AUTHOR=$(git log -1 --pretty=format:'%an <%ae>' 2>/dev/null || echo unknown)"
   echo ""
+  echo "RECENT_COMMITS:"
+  git log "$base_branch...HEAD" --oneline 2>/dev/null | head -50
+  echo ""
   echo "DIFF_STAT:"
   git diff --stat "$base_branch...HEAD" 2>/dev/null | head -40
   echo ""
@@ -106,6 +109,7 @@ mode_changelog_diff() {
 **Date**: {{DATE}}
 **Author**: {{AUTHOR}}
 **Branch**: {{BRANCH}}
+**Tickets**: {{TICKETS}}
 <!-- AI-generated -->
 
 ## Overview
@@ -140,16 +144,22 @@ The skill performs surgical analysis of the diff and generates the documentation
    - Run `doc-context env` to acquire `DATE` and confirm the existence of `docs/` (aborting and recommending `/docs:init` if it doesn't exist).
    - Run `doc-context changelog-diff` to collect `BASE_BRANCH`, `CURRENT_BRANCH`, `AUTHOR`, and the file diff.
 
-2. **Step 2: Argument Resolution**
+2. **Step 2: Argument Resolution & Ticket Extraction**
    - Read `$ARGUMENTS`. Detect `--yes` / `-y`.
    - Resolve the target `[name]`. If none is passed in arguments:
      - Prompt the user using `AskUserQuestion` to input the name of the feature, module, or task.
      - Convert the name to a slug (lowercase kebab-case).
+   - **Ticket Extraction**:
+     - Automatically parse the current branch name and `RECENT_COMMITS` from Step 1 for task tracking ticket patterns (e.g., Jira keys like `PROJ-123`, `TASK-456` or GitHub issue numbers like `#123`).
+     - If `--yes` is not set:
+       - Present any discovered tickets and use `AskUserQuestion` to let the user confirm them, modify them, or manually input additional tickets (comma-separated).
+       - If no tickets were found, prompt the user if they want to enter any ticket numbers (optional, press Enter/skip).
 
 3. **Step 3: Analyze and Synthesize**
    - Map files added/modified/deleted to Keep a Changelog sections.
    - Synthesize concise, accurate summaries of code changes. Avoid fabricating business value; focus on functional behavior.
-   - Inject the variables (`DATE`, slug-name, author, branch) into the template.
+   - Inject the resolved variables (`DATE`, slug-name, author, branch, tickets) into the template.
+   - **Ticket Tracing**: Wherever appropriate and logical, append or prepend the relevant ticket numbers (e.g., `[PROJ-123]`) to the end of individual bullet points in the changelog to maintain direct traceability.
 
 4. **Step 4: Preview & Confirm (Safety Gate)**
    - Construct the output path: `docs/changelog/YYYY/MM/DD/[name].md`.
