@@ -9,3 +9,4 @@
 
 # Node (in case the plugin grows tooling later)
 node_modules/
+graphify-out/
